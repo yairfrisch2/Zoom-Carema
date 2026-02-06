@@ -3,19 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Zoom Camera - Intercom</title>
+    <title>Zoom Camera</title>
     
     <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;700;900&display=swap');
-        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&display=swap'); /* פונט באנגלית לכותרת */
         
         * { margin: 0; padding: 0; box-sizing: border-box; }
         :root {
             --primary: #0a0e27;
             --accent: #00ff88;
             --danger: #ff3366;
-            --warning: #ffbd2e;
             --surface: #1a1f3a;
             --text: #e8eaf6;
         }
@@ -36,6 +35,7 @@
 
         .header { text-align: center; margin: 30px 0; }
         
+        /* עיצוב מיוחד לכותרת באנגלית */
         h1 { 
             font-family: 'Montserrat', sans-serif;
             font-size: 2.5rem; 
@@ -123,21 +123,10 @@
             align-items: center;
             justify-content: center;
             transition: all 0.3s;
-            position: relative;
         }
         
         .control-btn.off { background: var(--danger); color: white; }
-        .control-btn.active { background: var(--warning); color: var(--primary); box-shadow: 0 0 15px var(--warning); }
         .control-btn.danger { background: var(--danger); }
-        
-        .control-label {
-            font-size: 0.7rem;
-            position: absolute;
-            bottom: -20px;
-            width: 100%;
-            text-align: center;
-            color: #ccc;
-        }
 
         .code-display {
             font-size: 3.5rem;
@@ -181,21 +170,6 @@
         .dot { width: 8px; height: 8px; background: red; border-radius: 50%; }
         .dot.live { background: #00ff88; box-shadow: 0 0 10px #00ff88; }
         
-        /* אינדיקטור שמיעה אצל המשדר */
-        #audioIndicator {
-            position: absolute;
-            top: 15px;
-            left: 15px;
-            background: rgba(255, 189, 46, 0.8);
-            color: black;
-            padding: 5px 10px;
-            border-radius: 10px;
-            font-weight: bold;
-            font-size: 0.8rem;
-            display: none;
-            z-index: 6;
-        }
-
     </style>
 </head>
 <body>
@@ -228,40 +202,15 @@
         <div id="viewerVideoContainer" class="card" style="display:none;">
             <div class="video-container">
                 <div class="status-badge"><div class="dot live"></div>שידור חי</div>
-                <video id="viewerVideo" autoplay playsinline></video>
-                <button id="unmuteBtn" onclick="app.unmuteVideo()">🔇 לחץ לשמיעת המצלמה</button>
+                <video id="viewerVideo" autoplay playsinline muted></video>
+                <button id="unmuteBtn" onclick="app.unmuteVideo()">🔇 לחץ להפעלת שמע</button>
             </div>
             
             <div class="controls">
-                <div style="position:relative">
-                    <button id="btnMic" class="control-btn" onclick="app.activateStreamerMic()">🎤</button>
-                    <span class="control-label">שמע</span>
-                </div>
-
-                <div style="position:relative">
-                    <button id="btnTalk" class="control-btn off" onclick="app.toggleViewerMic()">🎙️</button>
-                    <span class="control-label">דבר</span>
-                </div>
-
-                <div style="position:relative">
-                    <button id="btnSwitch" class="control-btn" onclick="app.remoteSwitchCamera()">🔄</button>
-                    <span class="control-label">הפך</span>
-                </div>
-                
-                <div style="position:relative">
-                    <button id="btnCam" class="control-btn" onclick="app.remoteToggleCamera()">📷</button>
-                    <span class="control-label">וידאו</span>
-                </div>
-
-                <div style="position:relative">
-                    <button class="control-btn danger" onclick="app.disconnect()">❌</button>
-                    <span class="control-label">נתק</span>
-                </div>
-            </div>
-            
-            <div id="micStatusMsg" style="text-align: center; margin-top: 25px; font-size: 0.85rem; color: #aaa; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px;">
-                💡 <strong>מצב ווקי-טוקי:</strong><br>
-                לחץ על 🎙️ כדי לדבר (יבקש הרשאה).
+                <button id="btnCam" class="control-btn" onclick="app.remoteToggleCamera()">📷</button>
+                <button id="btnMic" class="control-btn" onclick="app.remoteToggleMic()">🎤</button>
+                <button id="btnSwitch" class="control-btn" onclick="app.remoteSwitchCamera()">🔄</button>
+                <button class="control-btn danger" onclick="app.disconnect()">❌</button>
             </div>
         </div>
     </div>
@@ -283,13 +232,7 @@
         <div id="streamerVideoContainer" class="card" style="display:none;">
             <div class="video-container">
                 <div class="status-badge"><div class="dot live"></div>משדר כעת</div>
-                <div id="audioIndicator">🔊 שומעים את הצופה</div>
-                
                 <video id="streamerVideo" autoplay playsinline muted></video>
-                <audio id="streamerAudioIncoming" autoplay playsinline></audio>
-            </div>
-            <div style="text-align: center; margin-top: 15px; color: #aaa;">
-                השידור פעיל - וודא שהווליום בטלפון פועל
             </div>
         </div>
     </div>
@@ -302,17 +245,14 @@
         conn: null,
         currentCall: null,
         localStream: null,
-        viewerLocalStream: null, // הסטריים של הצופה (מיקרופון)
         peerIdPrefix: 'secure-cam-app-',
         
+        // מצבים
         camEnabled: true,
-        streamerMicEnabled: true, 
-        viewerMicEnabled: false,
-        
-        currentFacingMode: 'environment',
+        micEnabled: true,
+        currentFacingMode: 'environment', // מתחיל במצלמה אחורית
         
         init() {
-            // מניעת כיבוי מסך
             if ('wakeLock' in navigator) {
                 navigator.wakeLock.request('screen').catch(console.error);
             }
@@ -330,25 +270,18 @@
 
         // --- VIEWER LOGIC ---
         
-        async startViewing() {
+        startViewing() {
             this.showScreen('viewingScreen');
-            
-            // יצירת קוד מהיר
             const code = Math.floor(1000 + Math.random() * 9000).toString();
             document.getElementById('viewerCode').innerText = code;
             
-            // איפוס
-            this.camEnabled = true; 
-            this.streamerMicEnabled = true;
-            this.viewerMicEnabled = false;
-            this.viewerLocalStream = null;
+            this.camEnabled = true; this.micEnabled = true;
             this.updateButtonsUI();
 
             this.peer = new Peer(this.peerIdPrefix + code);
             
-            this.peer.on('open', (id) => console.log('Viewer ID ready'));
+            this.peer.on('open', (id) => console.log('Viewer ready'));
 
-            // חיבור נתונים (Data Connection)
             this.peer.on('connection', (conn) => {
                 this.conn = conn;
                 document.getElementById('codeCard').style.display = 'none';
@@ -356,31 +289,11 @@
                 conn.on('close', () => this.disconnect());
             });
 
-            // שיחת מדיה (Media Call)
-            this.peer.on('call', async (call) => {
-                this.currentCall = call;
-                
-                // טריק חשוב: אנחנו יוצרים סטריים אודיו "ריק" ושולחים אותו מיד
-                // זה מבטיח שהחיבור יהיה מוכן לקבל אודיו כשהמשתמש ירצה לדבר
-                try {
-                    // יוצר הקשר אודיו שקט
-                    const ctx = new AudioContext();
-                    const oscillator = ctx.createOscillator();
-                    const dst = ctx.createMediaStreamDestination();
-                    oscillator.connect(dst);
-                    oscillator.start();
-                    // אנחנו שולחים את הטראק השקט הזה, אבל נחליף אותו במיקרופון אמיתי אחר כך
-                    const silentStream = Object.assign(dst.stream, { enabled: true });
-                    call.answer(silentStream);
-                } catch (e) {
-                    call.answer(); // גיבוי אם הטריק נכשל
-                }
-                
-                // קבלת הוידאו מהמשדר
+            this.peer.on('call', (call) => {
+                call.answer();
                 call.on('stream', (remoteStream) => {
                     const video = document.getElementById('viewerVideo');
                     video.srcObject = remoteStream;
-                    video.muted = true; // מתחילים מושתק (מדיניות דפדפן)
                     video.play().catch(e => console.log('Autoplay prevented'));
                     document.getElementById('unmuteBtn').style.display = 'block';
                 });
@@ -391,93 +304,6 @@
             const video = document.getElementById('viewerVideo');
             video.muted = false;
             document.getElementById('unmuteBtn').style.display = 'none';
-        },
-
-        // --- LOUDSPEAKER (Walkie Talkie) LOGIC ---
-
-        activateStreamerMic() {
-            // שליטה על המיקרופון של הצד השני (המשדר)
-            if (this.streamerMicEnabled) {
-                this.sendMicCommandToStreamer(false);
-                this.streamerMicEnabled = false;
-            } else {
-                this.sendMicCommandToStreamer(true);
-                this.streamerMicEnabled = true;
-                this.setViewerMic(false); 
-            }
-            this.updateButtonsUI();
-        },
-
-        async toggleViewerMic() {
-            const msgEl = document.getElementById('micStatusMsg');
-            
-            // כיבוי
-            if (this.viewerMicEnabled) {
-                this.setViewerMic(false);
-                this.updateButtonsUI();
-                msgEl.innerHTML = "💡 <strong>מצב ווקי-טוקי:</strong><br>לחץ לדבר.";
-                if(this.conn) this.conn.send({ type: 'viewerTalking', value: false });
-                return;
-            }
-
-            // הפעלה
-            // 1. השגת הרשאה למיקרופון אם אין עדיין
-            if (!this.viewerLocalStream) {
-                try {
-                    this.viewerLocalStream = await navigator.mediaDevices.getUserMedia({ 
-                        audio: { 
-                            echoCancellation: true, 
-                            noiseSuppression: true,
-                            autoGainControl: true 
-                        }, 
-                        video: false 
-                    });
-                } catch (err) {
-                    alert('לא ניתן להפעיל מיקרופון. וודא שאישרת גישה.');
-                    return;
-                }
-            }
-
-            // 2. החלפת הטראק השקט בטראק של המיקרופון האמיתי בתוך השיחה
-            if (this.currentCall && this.currentCall.peerConnection) {
-                const audioTrack = this.viewerLocalStream.getAudioTracks()[0];
-                const sender = this.currentCall.peerConnection.getSenders().find(s => s.track && s.track.kind === 'audio');
-                
-                if (sender) {
-                    sender.replaceTrack(audioTrack);
-                } else {
-                    // במקרה נדיר שאין שולח
-                    this.currentCall.peerConnection.addTrack(audioTrack, this.viewerLocalStream);
-                }
-            }
-
-            this.setViewerMic(true);
-            this.sendMicCommandToStreamer(false); // משתיקים את המצלמה כשאנחנו מדברים (למניעת הד)
-            this.streamerMicEnabled = false;
-            
-            // שולחים הודעה למשדר להציג אינדיקטור
-            if(this.conn) this.conn.send({ type: 'viewerTalking', value: true });
-
-            this.updateButtonsUI();
-            msgEl.innerHTML = "🎙️ <strong>אתה מדבר כעת</strong> (שומעים אותך)";
-        },
-
-        setViewerMic(isEnabled) {
-            if (this.viewerLocalStream) {
-                const track = this.viewerLocalStream.getAudioTracks()[0];
-                if (track) {
-                    track.enabled = isEnabled;
-                    this.viewerMicEnabled = isEnabled;
-                }
-            } else {
-                this.viewerMicEnabled = false;
-            }
-        },
-
-        sendMicCommandToStreamer(shouldEnable) {
-            if(this.conn) {
-                this.conn.send({ type: 'setAudio', value: shouldEnable });
-            }
         },
 
         // --- STREAMER LOGIC ---
@@ -493,13 +319,13 @@
             try {
                 this.localStream = await navigator.mediaDevices.getUserMedia({
                     video: { facingMode: this.currentFacingMode },
-                    audio: { echoCancellation: true }
+                    audio: true
                 });
                 
                 this.updateStreamerVideo();
 
             } catch (err) {
-                alert('חובה לאשר מצלמה ומיקרופון כדי להתחיל.');
+                alert('חובה לאשר גישה למצלמה ולמיקרופון!');
                 return;
             }
 
@@ -509,12 +335,11 @@
                 const viewerId = this.peerIdPrefix + code;
                 let connected = false;
                 
-                // חיבור Data
                 this.conn = this.peer.connect(viewerId);
                 
                 const connectionTimeout = setTimeout(() => {
                     if (!connected) {
-                        alert('לא נמצא קוד כזה.');
+                        alert('אין שיחה פעילה עם קוד כזה כרגע');
                         this.disconnect();
                         this.showScreen('streamingScreen');
                     }
@@ -527,37 +352,20 @@
                     document.getElementById('connectCard').style.display = 'none';
                     document.getElementById('streamerVideoContainer').style.display = 'block';
                     
-                    // יוזמים את השיחה (שולחים וידאו)
                     this.currentCall = this.peer.call(viewerId, this.localStream);
-                    
-                    // --- כאן התיקון הקריטי לשמע ---
-                    this.currentCall.on('stream', (incomingStream) => {
-                        const audioElem = document.getElementById('streamerAudioIncoming');
-                        audioElem.srcObject = incomingStream;
-                        // חובה לוודא שהאלמנט לא מושתק
-                        audioElem.muted = false; 
-                        audioElem.volume = 1.0;
-                        
-                        const playPromise = audioElem.play();
-                        if (playPromise !== undefined) {
-                            playPromise.catch(error => {
-                                console.error("Audio Play Error:", error);
-                                // אם הדפדפן חוסם, ננסה להפעיל בלחיצה (למרות שבד"כ בחיבור יזום זה עובד)
-                            });
-                        }
-                    });
                     
                     this.conn.on('data', (data) => this.handleRemoteCommand(data));
                     this.conn.on('close', () => {
-                        alert('הצופה התנתק.');
+                        alert('השידור הופסק על ידי הצופה');
                         this.goHome();
                     });
                 });
                 
                 this.peer.on('error', (err) => {
                     clearTimeout(connectionTimeout);
-                    alert('שגיאת תקשורת.');
+                    alert('אין שיחה פעילה עם קוד כזה כרגע');
                     this.disconnect();
+                    this.showScreen('streamingScreen');
                 });
             });
         },
@@ -572,12 +380,20 @@
             }
         },
 
-        // --- REMOTE CONTROLS & EVENTS ---
+        // --- REMOTE CONTROLS & UI ---
 
         remoteToggleCamera() {
             if(this.conn) {
                 this.conn.send({ type: 'toggleVideo' });
                 this.camEnabled = !this.camEnabled;
+                this.updateButtonsUI();
+            }
+        },
+
+        remoteToggleMic() {
+            if(this.conn) {
+                this.conn.send({ type: 'toggleAudio' });
+                this.micEnabled = !this.micEnabled;
                 this.updateButtonsUI();
             }
         },
@@ -590,48 +406,30 @@
         
         updateButtonsUI() {
             const btnCam = document.getElementById('btnCam');
-            const btnMic = document.getElementById('btnMic');   
-            const btnTalk = document.getElementById('btnTalk'); 
+            const btnMic = document.getElementById('btnMic');
             
             btnCam.className = this.camEnabled ? 'control-btn' : 'control-btn off';
             btnCam.innerText = this.camEnabled ? '📷' : '🚫';
 
-            if (this.streamerMicEnabled) {
-                btnMic.className = 'control-btn';
-                btnMic.innerText = '🎤';
-            } else {
-                btnMic.className = 'control-btn off';
-                btnMic.innerText = '🔇';
-            }
-
-            if (this.viewerMicEnabled) {
-                btnTalk.className = 'control-btn active';
-            } else {
-                btnTalk.className = 'control-btn off';
-            }
+            btnMic.className = this.micEnabled ? 'control-btn' : 'control-btn off';
+            btnMic.innerText = this.micEnabled ? '🎤' : '🔇';
         },
 
-        async handleRemoteCommand(data) {
-            // טיפול בפקודות שמגיעות מהצופה
-            
-            if (data.type === 'viewerTalking') {
-                // הצגת חיווי שהצופה מדבר
-                const indicator = document.getElementById('audioIndicator');
-                indicator.style.display = data.value ? 'block' : 'none';
-            }
+        // --- COMMAND HANDLER (Streamer Side) ---
 
+        async handleRemoteCommand(data) {
             if (!this.localStream) return;
             
             if (data.type === 'toggleVideo') {
+                this.camEnabled = !this.camEnabled;
                 const videoTrack = this.localStream.getVideoTracks()[0];
-                if (videoTrack) videoTrack.enabled = !videoTrack.enabled;
+                if (videoTrack) videoTrack.enabled = this.camEnabled;
             }
             
-            if (data.type === 'setAudio') {
-                // כיבוי/הדלקה של המיקרופון של המשדר
+            if (data.type === 'toggleAudio') {
+                this.micEnabled = !this.micEnabled;
                 const audioTrack = this.localStream.getAudioTracks()[0];
-                if (audioTrack) audioTrack.enabled = data.value;
-                this.streamerMicEnabled = data.value;
+                if (audioTrack) audioTrack.enabled = this.micEnabled;
             }
 
             if (data.type === 'switchCamera') {
@@ -641,21 +439,20 @@
 
         async performCameraSwitch() {
             this.currentFacingMode = (this.currentFacingMode === 'user') ? 'environment' : 'user';
+            
             this.localStream.getTracks().forEach(track => track.stop());
 
             try {
                 const newStream = await navigator.mediaDevices.getUserMedia({
                     video: { facingMode: this.currentFacingMode },
-                    audio: { echoCancellation: true } 
+                    audio: true 
                 });
                 
                 const newVideoTrack = newStream.getVideoTracks()[0];
                 const newAudioTrack = newStream.getAudioTracks()[0];
 
-                // החלת הסטטוס הקיים על המיקרופון החדש
-                if (newAudioTrack) {
-                    newAudioTrack.enabled = this.streamerMicEnabled;
-                }
+                if (newAudioTrack) newAudioTrack.enabled = this.micEnabled;
+                if (newVideoTrack) newVideoTrack.enabled = this.camEnabled;
 
                 this.localStream = newStream;
                 this.updateStreamerVideo();
@@ -669,9 +466,10 @@
                     const audioSender = senders.find(s => s.track && s.track.kind === 'audio');
                     if (audioSender) audioSender.replaceTrack(newAudioTrack);
                 }
+
             } catch (err) {
                 console.error("Error switching camera:", err);
-                alert("לא ניתן להחליף מצלמה");
+                alert("לא ניתן להחליף מצלמה (אולי היא בשימוש?)");
             }
         },
 
@@ -680,10 +478,6 @@
                 this.localStream.getTracks().forEach(track => track.stop());
                 this.localStream = null;
             }
-            if (this.viewerLocalStream) {
-                this.viewerLocalStream.getTracks().forEach(track => track.stop());
-                this.viewerLocalStream = null;
-            }
             if (this.peer) {
                 this.peer.destroy();
                 this.peer = null;
@@ -691,6 +485,7 @@
             document.getElementById('codeCard').style.display = 'block';
             document.getElementById('viewerVideoContainer').style.display = 'none';
             document.getElementById('connectCode').value = '';
+            
             window.location.reload();
         }
     };

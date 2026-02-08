@@ -8,7 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;700;900&display=swap');
-        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&display=swap'); /* פונט באנגלית לכותרת */
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&display=swap');
         
         * { margin: 0; padding: 0; box-sizing: border-box; }
         :root {
@@ -33,9 +33,8 @@
 
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        .header { text-align: center; margin: 30px 0; }
+        .header { text-align: center; margin: 30px 0; position: relative; }
         
-        /* עיצוב מיוחד לכותרת באנגלית */
         h1 { 
             font-family: 'Montserrat', sans-serif;
             font-size: 2.5rem; 
@@ -169,10 +168,73 @@
         
         .dot { width: 8px; height: 8px; background: red; border-radius: 50%; }
         .dot.live { background: #00ff88; box-shadow: 0 0 10px #00ff88; }
+
+        /* --- הגדרות עיצוב לגלגל השיניים ולמודל --- */
+        #settingsBtn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: none;
+            border: none;
+            font-size: 1.8rem;
+            cursor: pointer;
+            z-index: 100;
+            filter: grayscale(1);
+            transition: 0.3s;
+        }
+        #settingsBtn:hover { filter: grayscale(0); transform: rotate(45deg); }
+
+        .modal {
+            display: none; 
+            position: fixed; 
+            z-index: 200; 
+            left: 0; top: 0; width: 100%; height: 100%; 
+            background-color: rgba(0,0,0,0.8); 
+            align-items: center; justify-content: center;
+        }
+        
+        .modal-content {
+            background: var(--surface);
+            padding: 30px;
+            border-radius: 20px;
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+            border: 1px solid var(--accent);
+        }
+
+        .switch-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 20px 0;
+            padding: 15px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+        }
+
+        input[type=checkbox] {
+            transform: scale(1.5);
+            accent-color: var(--danger);
+        }
         
     </style>
 </head>
 <body>
+
+<button id="settingsBtn" onclick="app.openSettings()">⚙️</button>
+
+<div id="settingsModal" class="modal">
+    <div class="modal-content">
+        <h2 style="color: var(--accent); margin-bottom: 20px;">ניהול מערכת</h2>
+        <div class="switch-container">
+            <span>נעילת יצירת שידורים</span>
+            <input type="checkbox" id="systemLockCheckbox" onchange="app.toggleSystemLock()">
+        </div>
+        <p id="lockStatusText" style="font-size: 0.8rem; color: #aaa; margin-bottom: 20px;">המערכת פתוחה לשימוש</p>
+        <button class="btn btn-secondary" onclick="app.closeSettings()">סגור</button>
+    </div>
+</div>
 
 <div class="container">
     
@@ -250,11 +312,71 @@
         // מצבים
         camEnabled: true,
         micEnabled: true,
-        currentFacingMode: 'environment', // מתחיל במצלמה אחורית
-        
+        currentFacingMode: 'environment', 
+        isLocked: false, // מצב נעילה
+
         init() {
             if ('wakeLock' in navigator) {
                 navigator.wakeLock.request('screen').catch(console.error);
+            }
+            
+            // בדיקת נעילה בטעינה
+            const savedLock = localStorage.getItem('app_locked');
+            if (savedLock === 'true') {
+                this.isLocked = true;
+                document.getElementById('systemLockCheckbox').checked = true;
+                this.updateLockText();
+            }
+
+            // --- תיקון בעיית קפיאה בחזרה לכרטיסייה ---
+            document.addEventListener("visibilitychange", () => {
+                if (document.visibilityState === "visible") {
+                    console.log("Tab is visible again, refreshing video...");
+                    
+                    // רענון נגן הצופה
+                    const vVideo = document.getElementById('viewerVideo');
+                    if (vVideo.srcObject && vVideo.paused) {
+                        vVideo.play().catch(e => console.log("Resume viewer error", e));
+                    }
+                    
+                    // רענון נגן המשדר
+                    const sVideo = document.getElementById('streamerVideo');
+                    if (sVideo.srcObject && sVideo.paused) {
+                        sVideo.play().catch(e => console.log("Resume streamer error", e));
+                    }
+                }
+            });
+        },
+
+        // --- הגדרות ונעילה ---
+        openSettings() {
+            const password = prompt("הכנס סיסמת מנהל:");
+            if (password === "prha12345") {
+                document.getElementById('settingsModal').style.display = 'flex';
+            } else if (password !== null) {
+                alert("סיסמה שגויה");
+            }
+        },
+
+        closeSettings() {
+            document.getElementById('settingsModal').style.display = 'none';
+        },
+
+        toggleSystemLock() {
+            const checkbox = document.getElementById('systemLockCheckbox');
+            this.isLocked = checkbox.checked;
+            localStorage.setItem('app_locked', this.isLocked);
+            this.updateLockText();
+        },
+
+        updateLockText() {
+            const text = document.getElementById('lockStatusText');
+            if (this.isLocked) {
+                text.innerText = "המערכת נעולה - לא ניתן ליצור שידורים חדשים";
+                text.style.color = "var(--danger)";
+            } else {
+                text.innerText = "המערכת פתוחה לשימוש";
+                text.style.color = "var(--accent)";
             }
         },
 
@@ -271,6 +393,11 @@
         // --- VIEWER LOGIC ---
         
         startViewing() {
+            if (this.isLocked) {
+                alert("המערכת נעולה על ידי המנהל. לא ניתן להתחיל צפייה.");
+                return;
+            }
+
             this.showScreen('viewingScreen');
             const code = Math.floor(1000 + Math.random() * 9000).toString();
             document.getElementById('viewerCode').innerText = code;
@@ -309,6 +436,10 @@
         // --- STREAMER LOGIC ---
 
         startStreaming() {
+            if (this.isLocked) {
+                alert("המערכת נעולה על ידי המנהל. לא ניתן להתחיל שידור.");
+                return;
+            }
             this.showScreen('streamingScreen');
         },
 
